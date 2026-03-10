@@ -14,10 +14,11 @@ router = APIRouter(prefix="/quiz", tags=["Quiz"])
 
 @router.get("/start", response_model=QuizStartResponse)
 def start_quiz(
+    course: str = Query(..., description="The course name to generate the quiz for"),
     difficulty: Optional[str] = Query(None, description="Optional difficulty filter (easy, medium, hard)"),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Question)
+    query = db.query(Question).filter(Question.course == course)
     if difficulty:
          query = query.filter(Question.difficulty == difficulty.lower())
 

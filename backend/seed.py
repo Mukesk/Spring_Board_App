@@ -10,6 +10,7 @@ db = SessionLocal()
 seed_data = [
     {
         "question": "What is the capital of India?",
+        "course": "General Knowledge",
         "option_a": "Delhi",
         "option_b": "Mumbai",
         "option_c": "Chennai",
@@ -19,6 +20,7 @@ seed_data = [
     },
     {
         "question": "Which array method is used to add elements to the end of an array in JS?",
+        "course": "JavaScript Basics",
         "option_a": "push()",
         "option_b": "pop()",
         "option_c": "shift()",
@@ -28,6 +30,7 @@ seed_data = [
     },
     {
         "question": "In Python, which keyword is used to handle exceptions?",
+        "course": "Python Basics",
         "option_a": "catch",
         "option_b": "except",
         "option_c": "error",
@@ -37,6 +40,7 @@ seed_data = [
     },
     {
         "question": "What is the Big O complexity of accessing an array element by index?",
+        "course": "Data Structures and Algorithms",
         "option_a": "O(1)",
         "option_b": "O(log n)",
         "option_c": "O(n)",
@@ -46,6 +50,7 @@ seed_data = [
     },
     {
         "question": "What does CSS stand for?",
+        "course": "Web Development Basics",
         "option_a": "Cascading Style Sheets",
         "option_b": "Creative Style System",
         "option_c": "Computer Style Sheets",

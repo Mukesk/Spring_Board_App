@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from app.db.database import get_db
 from app.models.quiz import Question
 from app.schemas.quiz import GenerateQuestionRequest, GeneratedQuestionResponse
+from app.services.ai_agent import refresh_course_questions, refresh_all_courses
 
 # Load env vars
 load_dotenv()
@@ -64,3 +65,22 @@ def generate_question(req: GenerateQuestionRequest, db: Session = Depends(get_db
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+@router.post("/refresh-questions")
+def trigger_refresh_questions(course: str = None, db: Session = Depends(get_db)):
+    """
+    Manually triggers the course question refresh.
+    If 'course' is provided, it only refreshes that course.
+    Otherwise, it refreshes all existing courses in the database.
+    """
+    try:
+        if course:
+            success = refresh_course_questions(db, course)
+            if success:
+                return {"message": f"Successfully refreshed questions for course '{course}'."}
+            else:
+                raise HTTPException(status_code=500, detail=f"Failed to refresh questions for course '{course}'. Check logs for details.")
+        else:
+            refresh_all_courses(db)
+            return {"message": "Successfully triggered global refresh for all courses. Check logs to see progress."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -9,6 +9,7 @@ class Question(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     question = Column(String, index=True)
+    course = Column(String, index=True, nullable=True) # Optional for now to keep backwards compatibility
     option_a = Column(String)
     option_b = Column(String)
     option_c = Column(String)
