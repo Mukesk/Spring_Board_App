@@ -4,13 +4,30 @@ from datetime import datetime
 
 # --- Pydantic DTOs ---
 
+class CourseBase(BaseModel):
+    course_name: str
+
+class CourseCreate(CourseBase):
+    pass
+
+class CourseOut(CourseBase):
+    id: int
+    created_at: datetime
+    
+    model_config = {"from_attributes": True}
+
 class QuestionBase(BaseModel):
+    course_id: int
     question: str
     option_a: str
     option_b: str
     option_c: str
     option_d: str
+    correct_answer: str
     difficulty: str
+
+class QuestionCreate(QuestionBase):
+    pass
 
 class QuestionOut(BaseModel):
     id: int
@@ -32,6 +49,7 @@ class SubmittedAnswer(BaseModel):
 
 class QuizSubmitRequest(BaseModel):
     quiz_id: int
+    course_id: int
     user_id: int = 1 # Mock user for POC
     answers: List[SubmittedAnswer]
 
@@ -54,8 +72,11 @@ class ScorecardResponse(BaseModel):
 
 # AI Gen
 class GenerateQuestionRequest(BaseModel):
-    topic: str
-    difficulty: str
+    course_id: int
+    course_name: str
+    easy: int
+    medium: int
+    hard: int
 
 class GeneratedQuestionResponse(BaseModel):
     question: str

@@ -1,5 +1,5 @@
 from app.db.database import SessionLocal, engine, Base
-from app.models.quiz import Question
+from app.models.quiz import Question, Course
 
 # Ensure tables are created
 Base.metadata.create_all(bind=engine)
@@ -61,15 +61,31 @@ seed_data = [
 ]
 
 def seed_db():
-    # Only seed if no questions exist
-    if db.query(Question).count() == 0:
+    if db.query(Course).count() == 0:
+        print("Seeding Courses and Questions...")
+        
+        # 1. Gather all unique courses
+        course_names = list(set(item["course"] for item in seed_data))
+        course_map = {}
+        
+        for name in course_names:
+            c = Course(course_name=name)
+            db.add(c)
+            db.flush() # flush to get c.id
+            course_map[name] = c.id
+            
+        # 2. Add Questions
         for data in seed_data:
+            c_name = data.pop("course")
+            data["course_id"] = course_map[c_name]
             q = Question(**data)
             db.add(q)
+            
         db.commit()
-        print("Database seeded with sample questions!")
+        print("Database seeded with sample courses and questions!")
     else:
-        print("Database already contains questions. Skipping seed.")
+        print("Database already contains Data. Skipping seed.")
 
 if __name__ == "__main__":
     seed_db()
+

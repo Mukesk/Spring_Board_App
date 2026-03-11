@@ -5,9 +5,9 @@ import os
 from dotenv import load_dotenv
 
 from app.db.database import get_db
-from app.models.quiz import Question
+from app.models.quiz import Question, Course
 from app.schemas.quiz import GenerateQuestionRequest, GeneratedQuestionResponse
-from app.services.ai_agent import refresh_course_questions, refresh_all_courses
+from app.services.ai_agent import refresh_course_questions, refresh_all_courses, generate_questions_for_course
 
 # Load env vars
 load_dotenv()
@@ -20,67 +20,80 @@ def get_openai_client():
          raise HTTPException(status_code=500, detail="OPENAI_API_KEY is not configured. Please add it to your .env file.")
     return OpenAI(api_key=api_key)
 
-@router.post("/generate-question", response_model=GeneratedQuestionResponse)
-def generate_question(req: GenerateQuestionRequest, db: Session = Depends(get_db)):
+@router.post("/fill-question-bank")
+def fill_question_bank(req: GenerateQuestionRequest, db: Session = Depends(get_db)):
     """
-    Generates a question using OpenAI's Structured Outputs,
-    saves the question to the database, and returns it.
+    The admin can manually request AI to generate questions by specifying:
+    - Course ID
+    - Course name
+    - Number of questions per difficulty level
     """
-    client = get_openai_client()
+    # 1. Verify existence of course
+    course = db.query(Course).filter(Course.id == req.course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
 
     try:
-        completion = client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": "You are an expert quiz generator. Generate a 4-option multiple choice question. The answer must be one of the options."},
-                {"role": "user", "content": f"Generate a {req.difficulty} difficulty multiple-choice question about {req.topic}."}
-            ],
-            response_format=GeneratedQuestionResponse,
-        )
+        easy_qs = generate_questions_for_course(req.course_name, "easy", req.easy) if req.easy > 0 else []
+        medium_qs = generate_questions_for_course(req.course_name, "medium", req.medium) if req.medium > 0 else []
+        hard_qs = generate_questions_for_course(req.course_name, "hard", req.hard) if req.hard > 0 else []
         
-        parsed_question = completion.choices[0].message.parsed
+        all_generated = easy_qs + medium_qs + hard_qs
         
-        # Save to Database
-        # Ensuring we at least have 4 options, pad or slice as needed just in case
-        options = parsed_question.options
-        while len(options) < 4:
-            options.append("N/A")
+        if not all_generated:
+            raise HTTPException(status_code=500, detail="No questions were generated.")
             
-        new_q = Question(
-            question=parsed_question.question,
-            option_a=options[0],
-            option_b=options[1],
-            option_c=options[2],
-            option_d=options[3],
-            correct_answer=parsed_question.answer,
-            difficulty=req.difficulty.lower()
-        )
-        
-        db.add(new_q)
+        new_db_questions = []
+        for i, q in enumerate(all_generated):
+            options = q.options
+            while len(options) < 4:
+                options.append("N/A")
+                
+            if i < req.easy:
+                diff = "easy"
+            elif i < req.easy + req.medium:
+                diff = "medium"
+            else:
+                diff = "hard"
+                
+            new_q = Question(
+                question=q.question,
+                course_id=req.course_id,
+                option_a=options[0],
+                option_b=options[1],
+                option_c=options[2],
+                option_d=options[3],
+                correct_answer=q.answer,
+                difficulty=diff
+            )
+            new_db_questions.append(new_q)
+            
+        db.bulk_save_objects(new_db_questions)
         db.commit()
-        db.refresh(new_q)
         
-        return parsed_question
+        return {"message": f"Successfully generated and inserted {len(new_db_questions)} questions into the bank.", "count": len(new_db_questions)}
 
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/refresh-questions")
-def trigger_refresh_questions(course: str = None, db: Session = Depends(get_db)):
+def trigger_refresh_questions(course_id: int = None, db: Session = Depends(get_db)):
     """
     Manually triggers the course question refresh.
-    If 'course' is provided, it only refreshes that course.
+    If 'course_id' is provided, it only refreshes that course.
     Otherwise, it refreshes all existing courses in the database.
     """
     try:
-        if course:
-            success = refresh_course_questions(db, course)
+        if course_id:
+            success = refresh_course_questions(db, course_id)
             if success:
-                return {"message": f"Successfully refreshed questions for course '{course}'."}
+                return {"message": f"Successfully refreshed questions for course ID '{course_id}'."}
             else:
-                raise HTTPException(status_code=500, detail=f"Failed to refresh questions for course '{course}'. Check logs for details.")
+                raise HTTPException(status_code=500, detail=f"Failed to refresh questions for course ID '{course_id}'. Check logs for details.")
         else:
             refresh_all_courses(db)
             return {"message": "Successfully triggered global refresh for all courses. Check logs to see progress."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+

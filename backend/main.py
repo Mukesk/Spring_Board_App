@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from app.db.database import engine, Base
-from app.routers import quiz, ai
+from app.routers import quiz, ai, course, question
 from app.services.scheduler import start_scheduler, stop_scheduler
 
 # Create database tables
@@ -35,6 +35,8 @@ app.add_middleware(
 )
 
 # Include routers
+app.include_router(course.router)
+app.include_router(question.router)
 app.include_router(quiz.router)
 app.include_router(ai.router)
 

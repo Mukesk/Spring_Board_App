@@ -4,7 +4,7 @@ from typing import List, Optional
 import random
 
 from app.db.database import get_db
-from app.models.quiz import Question, QuizAttempt, UserAnswer
+from app.models.quiz import Question, QuizAttempt, UserAnswer, Course
 from app.schemas.quiz import (
     QuizStartResponse, QuestionOut, QuizSubmitRequest,
     QuizSubmitResponse, ScorecardResponse, EvaluatedAnswer
@@ -14,11 +14,16 @@ router = APIRouter(prefix="/quiz", tags=["Quiz"])
 
 @router.get("/start", response_model=QuizStartResponse)
 def start_quiz(
-    course: str = Query(..., description="The course name to generate the quiz for"),
+    course_id: int = Query(..., description="The ID of the course to generate the quiz for"),
     difficulty: Optional[str] = Query(None, description="Optional difficulty filter (easy, medium, hard)"),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Question).filter(Question.course == course)
+    # Verify course exists
+    course = db.query(Course).filter(Course.id == course_id).first()
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    query = db.query(Question).filter(Question.course_id == course_id)
     if difficulty:
          query = query.filter(Question.difficulty == difficulty.lower())
 
@@ -43,6 +48,7 @@ def start_quiz(
     # Create a new quiz attempt record
     new_attempt = QuizAttempt(
          user_id=1, # Mock user id
+         course_id=course_id,
          total_questions=len(questions_out)
     )
     db.add(new_attempt)
@@ -58,6 +64,10 @@ def submit_quiz(submit_data: QuizSubmitRequest, db: Session = Depends(get_db)):
     attempt = db.query(QuizAttempt).filter(QuizAttempt.id == submit_data.quiz_id).first()
     if not attempt:
         raise HTTPException(status_code=404, detail="Quiz not found")
+
+    # Double check course_id matches the attempt metadata (for safety)
+    if attempt.course_id != submit_data.course_id:
+        raise HTTPException(status_code=400, detail="Mismatched course_id for this quiz attempt.")
 
     score = 0
 
